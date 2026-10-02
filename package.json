@@ -1,24 +1,17 @@
 {
-  "name": "frontend",
+  "name": "ocampo-products-frontend",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "build": "vite build"
   },
   "dependencies": {
-    "lucide-react": "^1.49.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "@vitejs/plugin-react": "^4.4.1",
+    "vite": "^6.3.5",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
-  "devDependencies": {
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "@vitejs/plugin-react": "^6.1.1",
-    "oxlint": "^1.81.0",
-    "vite": "^8.3.0"
-  }
+  "devDependencies": {}
 }
