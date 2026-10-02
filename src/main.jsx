@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import './style.css';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
-const SESSION_KEY = 'ocampo-products-session';
+const SESSION_KEY = 'oriola-products-session';
 const emptyForm = { product_name: '', description: '', price: '', quantity: '' };
 
 function App() {
@@ -28,7 +28,11 @@ function App() {
     if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || result.message || 'Request failed.');
+    if (!response.ok) {
+      const error = new Error(result.error || result.message || 'Request failed.');
+      error.status = response.status;
+      throw error;
+    }
     return result;
   }
 
@@ -44,7 +48,7 @@ function App() {
       })
       .catch((reason) => {
         if (!active) return;
-        if (reason.message === 'Unauthorized') clearSession();
+        if (reason.status === 401) clearSession();
         else setError(reason.message);
       });
     return () => { active = false; };
@@ -91,7 +95,7 @@ function App() {
       setShowForm(false);
       setEditingId(null);
       setForm(emptyForm);
-      setNotice(editingId ? 'Product updated.' : 'Product added.');
+      setNotice(editingId ? 'Product updated successfully.' : 'Product created successfully.');
     } catch (reason) {
       setError(reason.message);
     } finally {
@@ -112,12 +116,12 @@ function App() {
   }
 
   async function deleteProduct(product) {
-    if (!window.confirm(`Delete ${product.product_name}?`)) return;
+    if (!window.confirm(`Are you sure you want to delete "${product.product_name}"?`)) return;
     setError('');
     try {
       await request(`/api/products/${product.id}`, { method: 'DELETE' });
       setProducts((current) => current.filter((item) => item.id !== product.id));
-      setNotice('Product deleted.');
+      setNotice('Product removed from catalog.');
     } catch (reason) {
       setError(reason.message);
     }
@@ -130,7 +134,7 @@ function App() {
         body: JSON.stringify({ refresh_token: session?.refresh_token }),
       });
     } catch {
-      // Clear the local session even if the API is temporarily unreachable.
+      // Clear local session even if unreachable
     }
     clearSession();
     setNotice('');
@@ -147,70 +151,192 @@ function App() {
   if (!session?.access_token) {
     return (
       <main className="login-layout">
-        <section className="login-panel">
-          <div className="brand-mark" aria-hidden="true">O</div>
-          <p className="eyebrow">OCAMPO · INVENTORY</p>
-          <h1>Sign in</h1>
-          <p className="intro">Manage your product catalog.</p>
-          {error && <p className="message error" role="alert">{error}</p>}
-          <form className="stack-form" onSubmit={submitLogin}>
-            <label>Username or email<input autoComplete="username" value={login.identifier} onChange={(event) => setLogin({ ...login, identifier: event.target.value })} required /></label>
-            <label>Password<input type="password" autoComplete="current-password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} required /></label>
-            <button className="button primary full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        <div className="login-card">
+          <header className="auth-header">
+            <div className="brand-badge">
+              <span className="brand-symbol">Oriola</span>
+            </div>
+            <h1>Welcome back</h1>
+            <p className="subtitle">Sign in to access your inventory workspace</p>
+          </header>
+
+          {error && <div className="alert alert-error" role="alert">{error}</div>}
+
+          <form className="auth-form" onSubmit={submitLogin}>
+            <div className="field-group">
+              <label htmlFor="identifier">Username or Email</label>
+              <input
+                id="identifier"
+                type="text"
+                autoComplete="username"
+                placeholder="e.g. oriola_admin"
+                value={login.identifier}
+                onChange={(event) => setLogin({ ...login, identifier: event.target.value })}
+                required
+              />
+            </div>
+
+            <div className="field-group">
+              <label htmlFor="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={login.password}
+                onChange={(event) => setLogin({ ...login, password: event.target.value })}
+                required
+              />
+            </div>
+
+            <button className="btn btn-primary btn-block" disabled={busy}>
+              {busy ? 'Authenticating…' : 'Sign In'}
+            </button>
           </form>
-        </section>
+        </div>
       </main>
     );
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#products"><span className="brand-mark small" aria-hidden="true">O</span><span>Ocampo<span className="brand-light"> / Inventory</span></span></a>
-        <div className="account"><span className="account-name">{session.user?.username || 'Account'}</span><button className="button quiet" onClick={logout}>Log out</button></div>
+    <div className="app-layout">
+      <header className="app-navbar">
+        <div className="navbar-container">
+          <div className="brand-group">
+            <div className="brand-icon">O</div>
+            <span className="brand-text">Oriola <span className="brand-sub">Inventory Suite</span></span>
+          </div>
+          <div className="user-profile">
+            <span className="user-name">{session.user?.username || 'User Workspace'}</span>
+            <button className="btn btn-secondary btn-sm" onClick={logout}>Log out</button>
+          </div>
+        </div>
       </header>
 
-      <section className="content" id="products">
-        <div className="heading-row">
-          <div><p className="eyebrow">CATALOG</p><h1>Products</h1><p className="intro">{products.length} {products.length === 1 ? 'item' : 'items'}</p></div>
-          <button className="button primary" onClick={openNewProduct}>Add product</button>
-        </div>
+      <main className="app-container">
+        <header className="page-header">
+          <div>
+            <span className="badge-tag">CATALOG MANAGEMENT</span>
+            <h2>Product Directory</h2>
+            <p className="page-meta">{products.length} {products.length === 1 ? 'total product' : 'total products'} listed</p>
+          </div>
+          <button className="btn btn-primary" onClick={openNewProduct}>+ New Product</button>
+        </header>
 
-        {notice && <p className="message success" role="status">{notice}</p>}
-        {error && <p className="message error" role="alert">{error}</p>}
+        {notice && <div className="alert alert-success" role="status">{notice}</div>}
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
 
         {showForm && (
-          <form className="product-form" onSubmit={submitProduct}>
-            <div className="form-heading"><h2>{editingId ? 'Edit product' : 'New product'}</h2><button className="button quiet" type="button" onClick={() => setShowForm(false)}>Cancel</button></div>
-            <label>Product name<input maxLength="100" value={form.product_name} onChange={(event) => setForm({ ...form, product_name: event.target.value })} required /></label>
-            <label>Description<textarea rows="3" value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></label>
-            <div className="form-grid">
-              <label>Price<input type="number" min="0" step="0.01" value={form.price} onChange={(event) => setForm({ ...form, price: event.target.value })} required /></label>
-              <label>Quantity<input type="number" min="0" step="1" value={form.quantity} onChange={(event) => setForm({ ...form, quantity: event.target.value })} required /></label>
+          <div className="modal-card">
+            <div className="card-header">
+              <h3>{editingId ? 'Edit Product Details' : 'Add New Catalog Item'}</h3>
+              <button className="btn-close" type="button" onClick={() => setShowForm(false)}>✕</button>
             </div>
-            <button className="button primary" disabled={busy}>{busy ? 'Saving…' : editingId ? 'Save changes' : 'Create product'}</button>
-          </form>
+            <form className="modal-form" onSubmit={submitProduct}>
+              <div className="field-group">
+                <label>Product Name</label>
+                <input
+                  maxLength="100"
+                  placeholder="e.g. Ergonomic Desk Chair"
+                  value={form.product_name}
+                  onChange={(event) => setForm({ ...form, product_name: event.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="field-group">
+                <label>Description</label>
+                <textarea
+                  rows="3"
+                  placeholder="Enter detailed description..."
+                  value={form.description}
+                  onChange={(event) => setForm({ ...form, description: event.target.value })}
+                />
+              </div>
+
+              <div className="field-grid">
+                <div className="field-group">
+                  <label>Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={form.price}
+                    onChange={(event) => setForm({ ...form, price: event.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="field-group">
+                  <label>Quantity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    placeholder="0"
+                    value={form.quantity}
+                    onChange={(event) => setForm({ ...form, quantity: event.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="form-actions">
+                <button className="btn btn-secondary" type="button" onClick={() => setShowForm(false)}>Cancel</button>
+                <button className="btn btn-primary" disabled={busy}>
+                  {busy ? 'Saving...' : editingId ? 'Update Item' : 'Create Item'}
+                </button>
+              </div>
+            </form>
+          </div>
         )}
 
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Product</th><th>Price</th><th>Quantity</th><th>Created</th><th><span className="visually-hidden">Actions</span></th></tr></thead>
-            <tbody>
-              {products.map((product) => (
-                <tr key={product.id}>
-                  <td><strong>{product.product_name}</strong>{product.description && <span className="description">{product.description}</span>}</td>
-                  <td>${Number(product.price).toFixed(2)}</td>
-                  <td><span className={Number(product.quantity) === 0 ? 'quantity empty' : 'quantity'}>{product.quantity}</span></td>
-                  <td>{product.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}</td>
-                  <td className="actions"><button className="button quiet" onClick={() => editProduct(product)}>Edit</button><button className="button danger" onClick={() => deleteProduct(product)}>Delete</button></td>
+        <div className="data-card">
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Product Details</th>
+                  <th>Price</th>
+                  <th>Stock Level</th>
+                  <th>Date Added</th>
+                  <th className="text-right">Actions</th>
                 </tr>
-              ))}
-              {products.length === 0 && <tr><td className="empty-state" colSpan="5">No products yet. Add one to get started.</td></tr>}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {products.map((product) => (
+                  <tr key={product.id}>
+                    <td>
+                      <span className="product-title">{product.product_name}</span>
+                      {product.description && <span className="product-desc">{product.description}</span>}
+                    </td>
+                    <td className="price-tag">${Number(product.price).toFixed(2)}</td>
+                    <td>
+                      <span className={Number(product.quantity) === 0 ? 'stock-pill out' : 'stock-pill'}>
+                        {Number(product.quantity) === 0 ? 'Out of Stock' : `${product.quantity} units`}
+                      </span>
+                    </td>
+                    <td className="date-cell">{product.created_at ? new Date(product.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="text-right">
+                      <div className="action-group">
+                        <button className="btn-icon edit" title="Edit" onClick={() => editProduct(product)}>Edit</button>
+                        <button className="btn-icon delete" title="Delete" onClick={() => deleteProduct(product)}>Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {products.length === 0 && (
+                  <tr>
+                    <td className="empty-row" colSpan="5">No products in directory yet. Click "+ New Product" to populate your catalog.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
 

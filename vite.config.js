@@ -1,20 +1,20 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    host: '127.0.0.1',
-    port: 5173,
-    cors: {
-      origin: 'https://api-tester.marasigan.dev',
-    },
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1',
-        changeOrigin: true,
-        headers: { Host: 'Ocampo_LAB6.test' },
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+
+  return {
+    plugins: [react()],
+    server: {
+      host: '127.0.0.1',
+      port: 5173,
+      proxy: {
+        '/api': {
+          target: env.VITE_BACKEND_PROXY_TARGET || 'http://127.0.0.1/Manuel_Activity_6/backend/public',
+          changeOrigin: true,
+        },
       },
     },
-  },
+  };
 });
