@@ -27,11 +27,23 @@ function App() {
     const headers = { ...(options.body ? { 'Content-Type': 'application/json' } : {}), ...options.headers };
     if (token) headers.Authorization = `Bearer ${token}`;
     const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
-    const result = await response.json().catch(() => ({}));
+    const body = await response.text();
+    let result = null;
+    try {
+      result = body ? JSON.parse(body) : null;
+    } catch {
+      result = null;
+    }
     if (!response.ok) {
-      const error = new Error(result.error || result.message || 'Request failed.');
+      const message = result?.error || result?.message || (response.status === 404
+        ? 'API route not found. Set VITE_API_BASE_URL to your deployed backend URL and redeploy the frontend.'
+        : `Request failed (${response.status}).`);
+      const error = new Error(message);
       error.status = response.status;
       throw error;
+    }
+    if (!result || typeof result !== 'object') {
+      throw new Error('The backend returned an empty or invalid response. Set VITE_API_BASE_URL to your deployed backend URL and redeploy the frontend.');
     }
     return result;
   }
